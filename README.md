@@ -1,4 +1,4 @@
-# DeepSpace-SLM 🚀
+# DeepSpace-SLM
 
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-ee4c2c.svg)](https://pytorch.org/)
@@ -10,7 +10,7 @@
 
 ---
 
-## 🌟 Overview
+## Overview
 
 **DeepSpace-SLM** is a hyper-compact, radiation-resilient, 428K-parameter Small Language Model and logistics engine engineered specifically for long-duration deep space habitats (e.g., Lunar Gateway, Mars Habitats). 
 
@@ -18,7 +18,7 @@ Designed to operate on severe power constraints (under 5W edge microcontrollers)
 
 ---
 
-## 📐 System Architecture
+## System Architecture
 
 ```
                                  +-------------------------------------------------------+
@@ -51,20 +51,20 @@ Designed to operate on severe power constraints (under 5W edge microcontrollers)
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- 🧠 **Compact Transformer Core**: 428K parameters using Rotary Position Embeddings (RoPE), RMSNorm, SwiGLU activations, Differential Multi-Query Attention, and Medusa heads for speculative sampling.
-- ⚡ **Bare-Metal C SIMD Runtime**: Highly tuned C vectorization engine (`dslm_dot_product_int8`, `dslm_matvec_int8`) achieving **37.26 GOPS** on standard AVX2/SIMD edge hardware.
-- 🛡️ **Radiation-Adaptive Precision & Guarding (RAP-G)**: Dynamic telemetry-driven engine adapting quantization levels (`FP32`, `INT8`, `INT4`) and Triple Modular Redundancy (TMR median voting) depending on cosmic radiation threat levels (Low, Medium, Solar Flare, Cosmic Ray Surge).
-- 🔀 **Mixture-of-Experts (MoE)**: Sparse Top-1 / Top-k expert routing for localized domain specialization (Logistics, Diagnostics, Environmental Systems).
-- 📦 **Space Habitat Inventory Management**: Integrated SQLite database with Merkle DAG cryptographic transaction verification.
-- 🌐 **Delay-Tolerant Networking (DTN Mesh)**: Store-and-forward bundle protocol simulating interplanetary comms latency and orbital node routing.
-- 🔤 **Byte-Level BPE Tokenizer**: Custom GPT-2 style byte-level subword tokenizer (`Ġ` space handling).
-- 📋 **Grammar-Constrained Decoding**: Finite-state grammar sampler enforcing structured JSON schema outputs for zero-parser-error downstream function calling.
+- **Compact Transformer Core**: 428K parameters using Rotary Position Embeddings (RoPE), RMSNorm, SwiGLU activations, Differential Multi-Query Attention, and Medusa heads for speculative sampling.
+- **Bare-Metal C SIMD Runtime**: Highly tuned C vectorization engine (`dslm_dot_product_int8`, `dslm_matvec_int8`) achieving **37.26 GOPS** on standard AVX2/SIMD edge hardware.
+- **Radiation-Adaptive Precision & Guarding (RAP-G)**: Dynamic telemetry-driven engine adapting quantization levels (`FP32`, `INT8`, `INT4`) and Triple Modular Redundancy (TMR median voting) depending on cosmic radiation threat levels (Low, Medium, Solar Flare, Cosmic Ray Surge).
+- **Mixture-of-Experts (MoE)**: Sparse Top-1 / Top-k expert routing for localized domain specialization (Logistics, Diagnostics, Environmental Systems).
+- **Space Habitat Inventory Management**: Integrated SQLite database with Merkle DAG cryptographic transaction verification.
+- **Delay-Tolerant Networking (DTN Mesh)**: Store-and-forward bundle protocol simulating interplanetary comms latency and orbital node routing.
+- **Byte-Level BPE Tokenizer**: Custom GPT-2 style byte-level subword tokenizer (`Ġ` space handling).
+- **Grammar-Constrained Decoding**: Finite-state grammar sampler enforcing structured JSON schema outputs for zero-parser-error downstream function calling.
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 deepspaceslm/
@@ -114,7 +114,7 @@ deepspaceslm/
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### 1. Installation
 
@@ -146,7 +146,7 @@ python3 cli.py
 
 Example CLI session:
 ```text
-🛰️ DeepSpace-SLM Command Center [Mode: RAPG_AUTO]
+DeepSpace-SLM Command Center [Mode: RAPG_AUTO]
 Type /help for command list.
 
 [Habitat Agent]> /stock Oxygen Tank
@@ -194,7 +194,7 @@ gcc -O3 -mavx2 c_runtime/test_simd.c c_runtime/deepspaceslm.c -o c_runtime/test_
 
 ---
 
-## 💻 Code Examples & API Usage
+## Code Examples & API Usage
 
 ### PyTorch Inference
 
@@ -245,7 +245,7 @@ print(f"Merkle Root: {root_hash[:12]}... | Integrity Valid: {is_valid}")
 
 ---
 
-## 📊 Benchmark & Performance Summary
+## Benchmark & Performance Summary
 
 Evaluated on standard edge hardware (Apple M-series / x86 AVX2):
 
@@ -261,13 +261,13 @@ Evaluated on standard edge hardware (Apple M-series / x86 AVX2):
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
 ---
 
-## 🌌 Citation & Acknowledgments
+## Citation & Acknowledgments
 
 If you find DeepSpace-SLM useful in your research or edge deployment systems, please cite this repository:
 
