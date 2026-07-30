@@ -121,7 +121,7 @@ deepspaceslm/
 Clone the repository and install requirements:
 
 ```bash
-git clone https://github.com/your-username/deepspaceslm.git
+git clone https://github.com/kramrakhiani/deepspace-slm.git
 cd deepspaceslm
 pip install -e .
 ```
@@ -275,7 +275,7 @@ If you find DeepSpace-SLM useful in your research or edge deployment systems, pl
 @software{deepspaceslm2026,
   author = {DeepSpace-SLM Team},
   title = {DeepSpace-SLM: Edge-Deployed Small Language Model for Autonomous Space Habitats},
-  url = {https://github.com/your-username/deepspaceslm},
+  url = {https://github.com/kramrakhiani/deepspace-slm},
   year = {2026}
 }
 ```
