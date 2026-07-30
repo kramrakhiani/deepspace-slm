@@ -13,7 +13,7 @@
     "symmetric": null,
     "per_channel": null
   },
-  "checksum_sha256": "206579cc999b1c3baf7ef581a9aa51cb0fa0e605cb24cb9ac70c5a0bf931217e",
+  "checksum_sha256": "141dabfee8ddb80a6777731c4b358337fedbdd65ea1db60616aec441eb35dae8",
   "total_params": 428672,
   "file_size_bytes": 1731168,
   "file_size_mb": 1.650970458984375,
