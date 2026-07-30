@@ -1,0 +1,217 @@
+{
+  "format": "DSLM",
+  "version": 1,
+  "model_config": {
+    "num_layers": 2,
+    "hidden_dim": 128,
+    "num_heads": 4,
+    "vocab_size": 256,
+    "max_seq_len": 64
+  },
+  "quantization": {
+    "weight_bits": 32,
+    "symmetric": null,
+    "per_channel": null
+  },
+  "checksum_sha256": "206579cc999b1c3baf7ef581a9aa51cb0fa0e605cb24cb9ac70c5a0bf931217e",
+  "total_params": 428672,
+  "file_size_bytes": 1731168,
+  "file_size_mb": 1.650970458984375,
+  "parameters": {
+    "token_embedding.embedding.weight": {
+      "offset": 0,
+      "shape": [
+        256,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 131072
+    },
+    "layers.0.attn_norm.weight": {
+      "offset": 131072,
+      "shape": [
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 512
+    },
+    "layers.0.ffn_norm.weight": {
+      "offset": 131584,
+      "shape": [
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 512
+    },
+    "layers.0.attention.q_proj.weight": {
+      "offset": 132096,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.0.attention.k_proj.weight": {
+      "offset": 197632,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.0.attention.v_proj.weight": {
+      "offset": 263168,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.0.attention.o_proj.weight": {
+      "offset": 328704,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.0.feed_forward.gate_proj.weight": {
+      "offset": 394240,
+      "shape": [
+        344,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "layers.0.feed_forward.up_proj.weight": {
+      "offset": 570368,
+      "shape": [
+        344,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "layers.0.feed_forward.down_proj.weight": {
+      "offset": 746496,
+      "shape": [
+        128,
+        344
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "layers.1.attn_norm.weight": {
+      "offset": 922624,
+      "shape": [
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 512
+    },
+    "layers.1.ffn_norm.weight": {
+      "offset": 923136,
+      "shape": [
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 512
+    },
+    "layers.1.attention.q_proj.weight": {
+      "offset": 923648,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.1.attention.k_proj.weight": {
+      "offset": 989184,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.1.attention.v_proj.weight": {
+      "offset": 1054720,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.1.attention.o_proj.weight": {
+      "offset": 1120256,
+      "shape": [
+        128,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 65536
+    },
+    "layers.1.feed_forward.gate_proj.weight": {
+      "offset": 1185792,
+      "shape": [
+        344,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "layers.1.feed_forward.up_proj.weight": {
+      "offset": 1361920,
+      "shape": [
+        344,
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "layers.1.feed_forward.down_proj.weight": {
+      "offset": 1538048,
+      "shape": [
+        128,
+        344
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 176128
+    },
+    "final_norm.weight": {
+      "offset": 1714176,
+      "shape": [
+        128
+      ],
+      "dtype": "torch.float32",
+      "size_bytes": 512
+    },
+    "layers.0.attention.rope.freqs": {
+      "offset": 1714688,
+      "shape": [
+        64,
+        16
+      ],
+      "dtype": "torch.complex64",
+      "size_bytes": 8192,
+      "packed_int4": false
+    },
+    "layers.1.attention.rope.freqs": {
+      "offset": 1722880,
+      "shape": [
+        64,
+        16
+      ],
+      "dtype": "torch.complex64",
+      "size_bytes": 8192,
+      "packed_int4": false
+    }
+  }
+}

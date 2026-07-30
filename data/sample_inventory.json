@@ -1,0 +1,105 @@
+{
+  "habitat": "Deep Space Habitat Artemis-VII",
+  "mission_day": 142,
+  "last_updated": "2031-06-15T08:30:00Z",
+  "modules": {
+    "alpha": {
+      "name": "Module Alpha - Command & Control",
+      "bays": {
+        "a1": {
+          "items": [
+            {"name": "o2 canister", "qty": 24, "max_qty": 48, "unit": "units", "criticality": "critical", "expiry": "2032-12-01"},
+            {"name": "n2 tank", "qty": 6, "max_qty": 12, "unit": "units", "criticality": "critical", "expiry": "2033-06-01"},
+            {"name": "co2 scrubber", "qty": 18, "max_qty": 24, "unit": "units", "criticality": "critical", "expiry": "2032-09-15"}
+          ]
+        },
+        "a2": {
+          "items": [
+            {"name": "air filter", "qty": 12, "max_qty": 36, "unit": "units", "criticality": "high", "expiry": "2032-03-01"},
+            {"name": "water filter", "qty": 3, "max_qty": 20, "unit": "units", "criticality": "critical", "expiry": "2032-01-15"},
+            {"name": "water purifier cartridge", "qty": 5, "max_qty": 8, "unit": "units", "criticality": "critical", "expiry": "2032-06-01"}
+          ]
+        }
+      }
+    },
+    "beta": {
+      "name": "Module Beta - Crew Quarters & Galley",
+      "bays": {
+        "b1": {
+          "items": [
+            {"name": "food ration", "qty": 540, "max_qty": 720, "unit": "packets", "criticality": "critical", "expiry": "2032-12-01"},
+            {"name": "protein bar", "qty": 89, "max_qty": 200, "unit": "bars", "criticality": "medium", "expiry": "2032-06-01"},
+            {"name": "freeze dried meal", "qty": 312, "max_qty": 480, "unit": "packets", "criticality": "high", "expiry": "2032-09-01"}
+          ]
+        },
+        "b2": {
+          "items": [
+            {"name": "vitamin supplement", "qty": 22, "max_qty": 30, "unit": "bottles", "criticality": "medium", "expiry": "2033-01-01"},
+            {"name": "waste disposal bag", "qty": 45, "max_qty": 100, "unit": "boxes", "criticality": "medium"},
+            {"name": "sanitizer bottle", "qty": 14, "max_qty": 20, "unit": "bottles", "criticality": "low", "expiry": "2034-01-01"}
+          ]
+        }
+      }
+    },
+    "gamma": {
+      "name": "Module Gamma - Laboratory & Medical",
+      "bays": {
+        "c1": {
+          "items": [
+            {"name": "medical kit", "qty": 5, "max_qty": 6, "unit": "kits", "criticality": "critical", "expiry": "2033-06-01"},
+            {"name": "bandage roll", "qty": 38, "max_qty": 50, "unit": "units", "criticality": "high", "expiry": "2033-12-01"},
+            {"name": "antibiotic pack", "qty": 20, "max_qty": 24, "unit": "packs", "criticality": "critical", "expiry": "2032-08-01"}
+          ]
+        },
+        "c2": {
+          "items": [
+            {"name": "painkiller bottle", "qty": 9, "max_qty": 12, "unit": "bottles", "criticality": "high", "expiry": "2032-10-01"},
+            {"name": "antiseptic wipe", "qty": 18, "max_qty": 30, "unit": "boxes", "criticality": "medium", "expiry": "2033-03-01"},
+            {"name": "syringe", "qty": 28, "max_qty": 40, "unit": "units", "criticality": "high", "expiry": "2033-06-01"}
+          ]
+        }
+      }
+    },
+    "delta": {
+      "name": "Module Delta - Engineering & EVA",
+      "bays": {
+        "d1": {
+          "items": [
+            {"name": "wrench set", "qty": 4, "max_qty": 4, "unit": "sets", "criticality": "medium"},
+            {"name": "multimeter", "qty": 2, "max_qty": 3, "unit": "units", "criticality": "medium"},
+            {"name": "soldering kit", "qty": 2, "max_qty": 2, "unit": "kits", "criticality": "medium"},
+            {"name": "cable bundle", "qty": 8, "max_qty": 15, "unit": "bundles", "criticality": "low"},
+            {"name": "seal gasket", "qty": 22, "max_qty": 60, "unit": "units", "criticality": "high"}
+          ]
+        },
+        "d2": {
+          "items": [
+            {"name": "circuit board", "qty": 7, "max_qty": 10, "unit": "units", "criticality": "high"},
+            {"name": "pump assembly", "qty": 2, "max_qty": 4, "unit": "units", "criticality": "critical"},
+            {"name": "valve actuator", "qty": 5, "max_qty": 8, "unit": "units", "criticality": "high"},
+            {"name": "battery cell", "qty": 18, "max_qty": 32, "unit": "cells", "criticality": "high"},
+            {"name": "solar panel module", "qty": 3, "max_qty": 4, "unit": "units", "criticality": "medium"}
+          ]
+        },
+        "d3": {
+          "items": [
+            {"name": "eva suit patch kit", "qty": 4, "max_qty": 6, "unit": "kits", "criticality": "critical"},
+            {"name": "suit helmet visor", "qty": 2, "max_qty": 3, "unit": "units", "criticality": "high"},
+            {"name": "tether cable", "qty": 6, "max_qty": 8, "unit": "units", "criticality": "high"}
+          ]
+        }
+      }
+    }
+  },
+  "alerts": [
+    {"item": "water filter", "status": "critical", "message": "Only 3 units remaining. Estimated 15 days at current consumption rate."},
+    {"item": "air filter", "status": "low", "message": "33% of maximum stock. Schedule resupply evaluation."},
+    {"item": "seal gasket", "status": "low", "message": "37% of maximum stock. Multiple maintenance tasks pending."}
+  ],
+  "consumption_rates": {
+    "o2 canister": {"rate": 0.5, "unit": "units/day"},
+    "food ration": {"rate": 12.0, "unit": "packets/day"},
+    "water filter": {"rate": 0.2, "unit": "units/day"},
+    "air filter": {"rate": 0.15, "unit": "units/day"}
+  }
+}

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepspaceslm"
+version = "1.0.0"
+description = "Highly Quantized, Edge-Deployed Small Language Model for Autonomous Habitat Inventory Maintenance on Deep Space Missions"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "DeepSpace-SLM Team" }
+]
+keywords = [
+    "small-language-model",
+    "edge-computing",
+    "quantization",
+    "mixture-of-experts",
+    "radiation-resilience",
+    "simd-c-runtime",
+    "space-logistics"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+dependencies = [
+    "torch>=2.1.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.66.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
