@@ -1,3 +1,11 @@
+"""
+Habitat Agent (Facade)
+=======================
+Backward-compatible facade that delegates all operations to the
+multi-agent coordinator. Preserves the original HabitatAgent public API
+so that existing tests and consumers continue to work unchanged.
+"""
+
 import re
 import hmac
 import hashlib
@@ -9,6 +17,14 @@ from inference.grammar import SchemaMasker
 from data.inventory_db import HabitatDatabase, ItemRecord
 from data.manuals import HabitatManualRetriever
 from quantization.rapg_engine import RAPGuardEngine, RadiationThreatLevel, RAPGuardStatus
+
+from inference.agents.base import AgentMessage, AgentResponse, MessagePriority
+from inference.agents.coordinator import AgentCoordinator
+from inference.agents.inventory_agent import InventoryAgent
+from inference.agents.radiation_agent import RadiationAgent
+from inference.agents.maintenance_agent import MaintenanceAgent
+from inference.agents.navigation_agent import NavigationAgent
+from inference.agents.inference_agent import InferenceAgent
 
 
 @dataclass
@@ -58,6 +74,19 @@ class TwoKeySecurityManager:
 
 
 class HabitatAgent:
+    """Backward-compatible facade over the multi-agent coordinator.
+
+    Preserves the full public API of the original monolithic HabitatAgent
+    while delegating all domain work to specialized agents via message passing.
+
+    The coordinator manages:
+        - InventoryAgent:    stock, locate, forecast, alerts
+        - RadiationAgent:    RAP-G telemetry and defense adaptation
+        - MaintenanceAgent:  maintenance logging, audit, manuals
+        - NavigationAgent:   DTN mesh networking
+        - InferenceAgent:    SLM neural text generation
+    """
+
     def __init__(
         self,
         engine: InferenceEngine,
@@ -84,118 +113,102 @@ class HabitatAgent:
         self.safety_validator = SafetyBoundaryValidator()
         self.rapg_engine = RAPGuardEngine()
 
+        # ── Multi-Agent Coordinator Setup ─────────────────────────────
+        self.coordinator = AgentCoordinator()
+
+        self._inventory_agent = InventoryAgent(
+            db=self.db,
+            mission_day=mission_day,
+            crew_size=crew_size,
+            critical_threshold=critical_threshold,
+            low_threshold=low_threshold,
+            prose_mode=prose_mode,
+        )
+        self._radiation_agent = RadiationAgent(rapg_engine=self.rapg_engine)
+        self._maintenance_agent = MaintenanceAgent(
+            db=self.db,
+            manual_retriever=self.manual_retriever,
+            mission_day=mission_day,
+            prose_mode=prose_mode,
+        )
+        self._navigation_agent = NavigationAgent(node_id="habitat-alpha")
+        self._inference_agent = InferenceAgent(engine=engine)
+
+        self.coordinator.register(self._inventory_agent)
+        self.coordinator.register(self._radiation_agent)
+        self.coordinator.register(self._maintenance_agent)
+        self.coordinator.register(self._navigation_agent)
+        self.coordinator.register(self._inference_agent)
+
+    # ── Mode Toggling ─────────────────────────────────────────────────
+
     def set_prose_mode(self, enabled: bool):
         self.prose_mode = enabled
+        self._inventory_agent.prose_mode = enabled
+        self._maintenance_agent.prose_mode = enabled
+
+    # ── Delegated to RadiationAgent ───────────────────────────────────
 
     def process_environmental_telemetry(self, radiation_ugy_h: float) -> RAPGuardStatus:
-        level = self.rapg_engine.evaluate_radiation_telemetry(radiation_ugy_h)
-        self.rapg_engine.adapt_model_defenses(self.engine.model)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="radiation_telemetry",
+            payload={"radiation_ugy_h": radiation_ugy_h, "model": self.engine.model},
+            source="habitat_agent",
+        ))
         return self.rapg_engine.get_status()
 
+    # ── Delegated to InventoryAgent ───────────────────────────────────
+
     def check_stock(self, item_name: str) -> InventoryResponse:
-        record = self.db.query_item(item_name)
-        if record:
-            if self.prose_mode:
-                raw_text = (
-                    f"We currently have {record.quantity} {record.unit} of {record.name} stored in {record.location}. "
-                    f"System status is {record.status}, with approximately {int(record.days_remaining)} days of supply remaining."
-                )
-            else:
-                raw_text = f"<RESPONSE> <ITEM> {record.name} <QTY> {record.quantity} {record.unit} <STATUS> {record.status} <LOC> {record.location}"
-
-            return InventoryResponse(
-                item=record.name,
-                quantity=record.quantity,
-                unit=record.unit,
-                location=record.location,
-                status=record.status,
-                days_remaining=int(record.days_remaining),
-                consumption_rate=record.consumption_rate,
-                raw_text=raw_text,
-                confidence=1.0,
-            )
-
-        prompt = f"<QUERY> check stock {item_name}"
-        raw = self.engine.generate(prompt, max_new_tokens=64, greedy=True)
-        return self._parse_response(raw)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="check_stock",
+            payload={"item_name": item_name},
+            source="habitat_agent",
+        ))
+        return self._agent_response_to_inventory(response, item_name)
 
     def locate(self, item_name: str) -> InventoryResponse:
-        record = self.db.query_item(item_name)
-        if record:
-            if self.prose_mode:
-                raw_text = f"The {record.name} is located in {record.location}. There are {record.quantity} {record.unit} available for immediate crew deployment."
-            else:
-                raw_text = f"<RESPONSE> <ITEM> {record.name} <LOC> {record.location} <QTY> {record.quantity} {record.unit} available"
-
-            return InventoryResponse(
-                item=record.name,
-                quantity=record.quantity,
-                unit=record.unit,
-                location=record.location,
-                status=record.status,
-                raw_text=raw_text,
-                confidence=1.0,
-            )
-
-        prompt = f"<QUERY> locate {item_name}"
-        raw = self.engine.generate(prompt, max_new_tokens=64, greedy=True)
-        return self._parse_response(raw)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="locate",
+            payload={"item_name": item_name},
+            source="habitat_agent",
+        ))
+        return self._agent_response_to_inventory(response, item_name)
 
     def forecast_usage(self, item_name: str, days: int = 30) -> InventoryResponse:
-        record = self.db.query_item(item_name)
-        if record:
-            if self.prose_mode:
-                raw_text = (
-                    f"At a daily consumption rate of {record.consumption_rate} {record.unit}/day, "
-                    f"the current stock of {record.name} ({record.quantity} {record.unit}) is estimated to last {int(record.days_remaining)} days."
-                )
-            else:
-                raw_text = f"<RESPONSE> <ITEM> {record.name} at rate of {record.consumption_rate} {record.unit}/day, estimated {int(record.days_remaining)} days remaining"
-
-            return InventoryResponse(
-                item=record.name,
-                quantity=record.quantity,
-                unit=record.unit,
-                location=record.location,
-                status=record.status,
-                days_remaining=int(record.days_remaining),
-                consumption_rate=record.consumption_rate,
-                raw_text=raw_text,
-                confidence=1.0,
-            )
-
-        prompt = f"<QUERY> forecast {item_name} consumption"
-        raw = self.engine.generate(prompt, max_new_tokens=96, greedy=True)
-        return self._parse_response(raw)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="forecast",
+            payload={"item_name": item_name, "days": days},
+            source="habitat_agent",
+        ))
+        return self._agent_response_to_inventory(response, item_name)
 
     def get_alerts(self) -> InventoryResponse:
-        critical_records = self.db.get_alerts(threshold_ratio=self.low_threshold)
-        if critical_records:
-            alerts = [f"{r.name}: {r.quantity} {r.unit} ({r.status})" for r in critical_records]
-            if self.prose_mode:
-                raw_text = "Attention Crew: The following items are critically low or reaching supply thresholds:\n" + "\n".join([f" • {a}" for a in alerts])
-            else:
-                raw_text = "<RESPONSE> " + " <SEP> ".join([f"<ALERT> {a}" for a in alerts])
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="get_alerts",
+            payload={},
+            source="habitat_agent",
+        ))
 
-            return InventoryResponse(
-                alerts=alerts,
-                raw_text=raw_text,
-                confidence=1.0,
-            )
+        raw_text = response.messages[0] if response.messages else ""
+        alerts = response.data.get("alerts", [])
 
-        if self.prose_mode:
-            raw_text = "All habitat supply levels are nominal. No active inventory alerts."
-        else:
-            raw_text = "<RESPONSE> all inventory levels are nominal. no alerts"
+        return InventoryResponse(
+            alerts=alerts,
+            raw_text=raw_text,
+            confidence=1.0,
+        )
 
-        return InventoryResponse(alerts=[], raw_text=raw_text, confidence=1.0)
+    # ── Delegated to MaintenanceAgent ─────────────────────────────────
 
     def log_maintenance(self, action: str, item_name: str, location: str) -> InventoryResponse:
-        res = self.db.log_maintenance(action, item_name, location, mission_day=self.mission_day)
-        if self.prose_mode:
-            raw_text = f"Maintenance action logged successfully: {item_name} was {action} at {location} on Mission Day {self.mission_day}."
-        else:
-            raw_text = f"<RESPONSE> logged: {item_name} {action} at {location} on mission day {self.mission_day}"
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="log_maintenance",
+            payload={"action": action, "item_name": item_name, "location": location},
+            source="habitat_agent",
+        ))
+
+        raw_text = response.messages[0] if response.messages else ""
 
         return InventoryResponse(
             item=item_name,
@@ -206,7 +219,14 @@ class HabitatAgent:
         )
 
     def query_procedure_manual(self, query: str) -> List[Dict[str, str]]:
-        return self.manual_retriever.search(query)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="query_manual",
+            payload={"query": query},
+            source="habitat_agent",
+        ))
+        return response.data.get("results", [])
+
+    # ── Security (kept on the facade — cross-cutting concern) ─────────
 
     def secure_update_quantity(
         self,
@@ -225,9 +245,17 @@ class HabitatAgent:
 
         return self.db.update_quantity(item_name, delta, performed_by="authenticated_crew", mission_day=self.mission_day)
 
+    # ── Delegated to InferenceAgent ───────────────────────────────────
+
     def free_query(self, query: str) -> str:
-        prompt = f"<QUERY> {query}"
-        return self.engine.generate(prompt, max_new_tokens=128, greedy=True)
+        response = self.coordinator.dispatch(AgentMessage(
+            intent="free_query",
+            payload={"query": query, "max_new_tokens": 128, "greedy": True},
+            source="habitat_agent",
+        ))
+        return response.data.get("generated_text", "")
+
+    # ── Response Parsing (legacy compatibility) ───────────────────────
 
     def _parse_response(self, raw_text: str) -> InventoryResponse:
         response = InventoryResponse(raw_text=raw_text)
@@ -278,6 +306,8 @@ class HabitatAgent:
         response.confidence = fields_found / 4.0
         return response
 
+    # ── Status Report ─────────────────────────────────────────────────
+
     def status_report(self) -> str:
         lines = [
             f"╔══════════════════════════════════════════╗",
@@ -287,11 +317,25 @@ class HabitatAgent:
             f"║  Mode:        {('Conversational Prose' if self.prose_mode else 'Machine Structured'):<26s}║",
             f"╠══════════════════════════════════════════╣",
         ]
-        rapg_status = self.rapg_engine.get_status()
-        lines.append(f"║  🛡️ RAP-G Threat Level: {rapg_status.threat_level.name:<16s}║")
-        lines.append(f"║     Radiation: {rapg_status.radiation_value_ugy_h:<5.1f} uGy/h             ║")
+
+        # Radiation status via coordinator
+        rad_response = self.coordinator.dispatch(AgentMessage(
+            intent="radiation_status", payload={}, source="habitat_agent",
+        ))
+        rad_data = rad_response.data
+        lines.append(f"║  🛡️ RAP-G Threat Level: {rad_data.get('threat_level', 'NOMINAL'):<16s}║")
+        lines.append(f"║     Radiation: {rad_data.get('radiation_ugy_h', 0.0):<5.1f} uGy/h             ║")
         lines.append(f"╠══════════════════════════════════════════╣")
 
+        # Agents summary
+        agents = self.coordinator.registered_agents
+        lines.append(f"║  🤖 Active Agents: {len(agents):<22d}║")
+        for aid, agent in agents.items():
+            cap_count = len(agent.capabilities)
+            lines.append(f"║    • {aid:<15s} ({cap_count} capabilities) ║")
+        lines.append(f"╠══════════════════════════════════════════╣")
+
+        # Alerts via coordinator
         alert_response = self.get_alerts()
         if alert_response.alerts:
             lines.append(f"║  ⚠️  ALERTS ({len(alert_response.alerts)}):")
@@ -301,3 +345,30 @@ class HabitatAgent:
             lines.append(f"║  ✅ All systems nominal                 ║")
         lines.append(f"╚══════════════════════════════════════════╝")
         return "\n".join(lines)
+
+    # ── Internal Helpers ──────────────────────────────────────────────
+
+    def _agent_response_to_inventory(
+        self, response: AgentResponse, item_name: str
+    ) -> InventoryResponse:
+        """Convert an AgentResponse from the inventory agent to InventoryResponse."""
+        data = response.data
+        raw_text = response.messages[0] if response.messages else ""
+
+        if response.status == "not_found":
+            # Fallback to SLM generation for unknown items
+            prompt = f"<QUERY> check stock {item_name}"
+            raw = self.engine.generate(prompt, max_new_tokens=64, greedy=True)
+            return self._parse_response(raw)
+
+        return InventoryResponse(
+            item=data.get("item"),
+            quantity=data.get("quantity"),
+            unit=data.get("unit"),
+            location=data.get("location"),
+            status=data.get("status"),
+            days_remaining=data.get("days_remaining"),
+            consumption_rate=data.get("consumption_rate"),
+            raw_text=raw_text,
+            confidence=1.0,
+        )

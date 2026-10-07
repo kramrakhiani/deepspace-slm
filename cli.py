@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 DeepSpace-SLM Interactive Terminal CLI
-Interactive terminal interface for Space Exploration Logistics & Infrastructure SLM.
+=========================================
+Multi-agent command center for Space Exploration Logistics & Infrastructure SLM.
+Routes commands through the AgentCoordinator to domain-specific agents.
 Supports toggling between Conversational Prose Mode and Machine Structured Mode.
 """
 
@@ -13,6 +15,7 @@ from data.tokenizer import HabitatTokenizer
 from model.transformer import DeepSpaceSLM
 from inference.engine import InferenceEngine
 from inference.habitat_agent import HabitatAgent
+from inference.agents.base import AgentMessage, MessagePriority
 from quantization.rapg_engine import RadiationThreatLevel
 
 
@@ -23,7 +26,7 @@ def print_banner():
  | | | |  _| |  _| | |_) \___ \| |_) / _ \ | |   |  _| \___ \  \___ \| |   | |\/| |
  | |_| | |___| |___|  __/ ___) |  __/ ___ \| |___| |___ ___) |  ___) | |___| |  | |
  |____/|_____|_____|_|   |____/|_| /_/   \_\____|_____|____/  |____/|_____|_|  |_|\033[0m
- \033[33m--- Space Exploration Logistics & Infrastructure Language Model (v2.0) ---\033[0m
+ \033[33m--- Multi-Agent Space Logistics & Infrastructure Command Center (v3.0) ---\033[0m
     """
     print(banner)
 
@@ -38,14 +41,31 @@ def print_help():
     print("  \033[32m/manual <query>\033[0m    Search habitat procedure manual (e.g. /manual co2 scrubber)")
     print("  \033[32m/rad <value>\033[0m       Simulate space radiation uGy/h (e.g. /rad 1200 for solar flare)")
     print("  \033[32m/status\033[0m            Display full habitat status report")
+    print("  \033[32m/agents\033[0m            List all registered agents and their capabilities")
+    print("  \033[32m/mesh\033[0m              Display DTN mesh network status")
+    print("  \033[32m/audit\033[0m             Verify Merkle DAG audit chain integrity")
     print("  \033[32m/help\033[0m              Show this help menu")
     print("  \033[32m/exit\033[0m or \033[32m/quit\033[0m     Exit the CLI")
     print("\n  \033[35mOr type any free-form question to query the DeepSpace-SLM inference engine directly!\033[0m\n")
 
 
+def print_agents(agent):
+    """Display all registered agents and their capabilities."""
+    agents = agent.coordinator.registered_agents
+    print(f"\033[36m╔══════════════════════════════════════════════════╗\033[0m")
+    print(f"\033[36m║  🤖 REGISTERED AGENTS ({len(agents)})                        ║\033[0m")
+    print(f"\033[36m╠══════════════════════════════════════════════════╣\033[0m")
+    for aid, ag in agents.items():
+        caps = ag.capabilities
+        print(f"\033[36m║\033[0m  \033[1;33m{aid:<15s}\033[0m  {len(caps)} capabilities")
+        for cap in caps:
+            print(f"\033[36m║\033[0m    \033[32m• {cap.intent:<20s}\033[0m {cap.description}")
+    print(f"\033[36m╚══════════════════════════════════════════════════╝\033[0m")
+
+
 def main():
     print_banner()
-    print("\033[90mInitializing DeepSpace-SLM Model & Knowledge Engine...\033[0m")
+    print("\033[90mInitializing DeepSpace-SLM Multi-Agent System...\033[0m")
 
     cfg = ModelConfig(
         vocab_size=256,
@@ -68,7 +88,9 @@ def main():
     engine = InferenceEngine(model, tok)
     agent = HabitatAgent(engine, prose_mode=True)
 
-    print("\033[32m[SYSTEM NOMINAL] Model loaded. Conversational Prose Mode Active.\033[0m\n")
+    # Show registered agents
+    agent_count = len(agent.coordinator.registered_agents)
+    print(f"\033[32m[MULTI-AGENT SYSTEM NOMINAL] {agent_count} domain agents active. Conversational Prose Mode.\033[0m\n")
     print_help()
 
     while True:
@@ -94,9 +116,28 @@ def main():
             elif cmd_lower == "/status":
                 print(agent.status_report())
 
+            elif cmd_lower == "/agents":
+                print_agents(agent)
+
             elif cmd_lower == "/alerts":
                 resp = agent.get_alerts()
                 print(f"\033[33m{resp.raw_text}\033[0m")
+
+            elif cmd_lower == "/audit":
+                response = agent.coordinator.dispatch(AgentMessage(
+                    intent="verify_audit", payload={}, source="cli",
+                ))
+                for msg in response.messages:
+                    color = "\033[32m" if response.data.get("audit_valid", False) else "\033[31m"
+                    print(f"{color}{msg}\033[0m")
+
+            elif cmd_lower == "/mesh":
+                response = agent.coordinator.dispatch(AgentMessage(
+                    intent="mesh_status", payload={}, source="cli",
+                ))
+                print(f"\033[36m[DTN MESH STATUS]\033[0m")
+                for msg in response.messages:
+                    print(f"  {msg}")
 
             elif cmd_lower.startswith("/stock "):
                 item = user_input[7:].strip()
@@ -137,7 +178,7 @@ def main():
                     print("\033[31mInvalid radiation float value. Example: /rad 1200\033[0m")
 
             else:
-                # Free-form SLM query
+                # Free-form SLM query — routed through InferenceAgent via coordinator
                 output = agent.free_query(user_input)
                 print(f"\033[32m[SLM RESPONSE]\033[0m {output}")
 

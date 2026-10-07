@@ -3,8 +3,8 @@
 [![Python Version](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/tests-115%20passed-brightgreen.svg)]()
-[![Architecture](https://img.shields.io/badge/Architecture-Transformer%20%2B%20MoE%20%2B%20SIMD-purple.svg)]()
+[![Build Status](https://img.shields.io/badge/tests-166%20passed-brightgreen.svg)]()
+[![Architecture](https://img.shields.io/badge/Architecture-Multi--Agent%20%2B%20Transformer%20%2B%20MoE%20%2B%20SIMD-purple.svg)]()
 
 > **Highly Quantized, Edge-Deployed Small Language Model (SLM) for Autonomous Habitat Inventory Maintenance on Deep Space Missions.**
 
@@ -21,44 +21,153 @@ Designed to operate on severe power constraints (under 5W edge microcontrollers)
 ## System Architecture
 
 ```
-                                 +-------------------------------------------------------+
-                                 |              DeepSpace Spacecraft Shell               |
-                                 +-------------------------------------------------------+
-                                                            |
-                     +--------------------------------------+--------------------------------------+
-                     |                                                                             |
-        [ Neural Architecture ]                                                       [ Mission Infrastructure ]
-                     |                                                                             |
-       +----------------------------+                                                +----------------------------+
-       | - 428K Parameter Backbone  |                                                | - Habitat Inventory DB     |
-       | - Rotary Embeddings (RoPE) |                                                | - Merkle DAG Audit Trail   |
-       | - SwiGLU + MoE Top-k Router|                                                | - DTN Mesh Routing Node    |
-       | - Medusa Speculative Heads |                                                | - Structured JSON Grammar  |
-       +----------------------------+                                                +----------------------------+
-                     |                                                                             |
-                     +--------------------------------------+--------------------------------------+
-                                                            |
-                                           +----------------------------------+
-                                           |     RAP-G Radiation Engine       |
-                                           | (Dynamic INT8/INT4 & TMR Voting) |
-                                           +----------------------------------+
-                                                            |
-                                           +----------------------------------+
-                                           |   Bare-Metal C SIMD Vectorizer   |
-                                           |      (37.26 GOPS INT8 Engine)    |
-                                           +----------------------------------+
+                              +─────────────────────────────────────────────────────────+
+                              │              DeepSpace Spacecraft Shell                 │
+                              +─────────────────────────────────────────────────────────+
+                                                          │
+                              +───────────────────────────────────────────────────────+
+                              │             Agent Coordinator (Message Bus)            │
+                              │     Intent Routing · Broadcast · Fan-out · Events     │
+                              +──┬──────────┬──────────┬───────────┬──────────┬───────+
+                                 │          │          │           │          │
+                    +────────────┴──+  +────┴─────+  +─┴─────────+ │  +──────┴───────+
+                    │ InventoryAgent│  │Radiation │  │Maintenance│ │  │InferenceAgent│
+                    │               │  │  Agent   │  │  Agent    │ │  │              │
+                    │ • check_stock │  │ • telem  │  │ • logging │ │  │ • free_query │
+                    │ • locate      │  │ • adapt  │  │ • audit   │ │  │ • perplexity │
+                    │ • forecast    │  │ • status │  │ • manuals │ │  │ • streaming  │
+                    │ • alerts      │  │ • bcast  │  │           │ │  │              │
+                    │ • update_qty  │  +──────────+  +───────────+ │  +──────────────+
+                    +───────────────+                    +-────────┴────────+
+                              │                          │ NavigationAgent │
+                              │                          │                 │
+                              │                          │ • mesh_update   │
+                              │                          │ • mesh_merge    │
+                              │                          │ • mesh_transmit │
+                              │                          │ • mesh_status   │
+                              │                          +-────────────────+
+               +──────────────┴───────────────+
+               │   Neural Architecture Core   │
+               │  428K Transformer + MoE      │
+               │  RoPE · SwiGLU · Medusa      │
+               +──────────────────────────────+
+                              │
+               +──────────────┴───────────────+
+               │     RAP-G Radiation Engine   │
+               │  INT8/INT4 · TMR Voting      │
+               +──────────────────────────────+
+                              │
+               +──────────────┴───────────────+
+               │  Bare-Metal C SIMD Vectorizer│
+               │    37.26 GOPS INT8 Engine    │
+               +──────────────────────────────+
 ```
+
+---
+
+## End-to-End Prompt Dataflow
+
+Here is the complete dataflow lifecycle illustrating what happens from the moment an operator inputs a prompt or command down through the message bus, neural forward pass, hardware guards, and verified response delivery:
+
+For an interactive visual Mermaid diagram of the complete data pipeline, see [**DATAFLOW.md**](DATAFLOW.md).
+
+### Dataflow Trace
+
+```
+[Operator Prompt] ───► [CLI Parser] ───► [AgentMessage(intent, payload)]
+                                                    │
+                                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                      AgentCoordinator (Message Bus)                    │
+│             Validates Message · Capability Lookup · Event Logging      │
+└────────────┬──────────────┬──────────────┬──────────────┬──────────────┘
+             │              │              │              │
+      check_stock        rad_event    log_maint       free_query
+             ▼              ▼              ▼              ▼
+     [InventoryAgent] [RadiationAgent] [MaintAgent] [InferenceAgent]
+             │              │              │              │
+       SQLite Lookup   RAP-G Adapt    Merkle DAG          │
+             │        (Broadcasts)         │              ▼
+             │              │              │      [Byte-Level BPE Tokenizer]
+             │              │              │              │ (Token IDs)
+             │              │              │              ▼
+             │              │              │      [Sensory Feature Encoders]
+             │              │              │              │
+             │              │              │              ▼
+             │              │              │      [DeepSpace-SLM Core (428K)]
+             │              │              │      • RMSNorm & RoPE Positional
+             │              │              │      • Diff Multi-Query Attention
+             │              │              │      • SwiGLU + Sparse MoE
+             │              │              │      • Medusa Speculative Heads
+             │              │              │              │
+             │              │              │              ▼
+             │              │              │      [RAP-G & Hardware Defense]
+             │              │              │      • INT8 SIMD GEMV (37 GOPS)
+             │              │              │      • INT4 + TMR Median Voting
+             │              │              │              │
+             │              │              │              ▼
+             │              │              │      [Grammar Masker + Sampler]
+             │              │              │              │
+             │              │              │              ▼
+             │              │              │      [BPE Detokenization]
+             │              │              │              │
+             └──────────────┼──────────────┼──────────────┘
+                            │
+                            ▼
+              [Coordinator Response Formatter]
+              • Conversational Prose vs Machine Structured JSON
+              • Event Logged with Monotonic ID & Timestamp
+                            │
+                            ▼
+           [Terminal CLI / Mission Control Output]
+```
+
+### Step-by-Step Dataflow Stages
+
+1. **Ingestion & Packaging**:
+   - The user enters text via the CLI, API, or spacecraft terminal.
+   - Slash commands (`/stock`, `/locate`, `/rad`, `/manual`, `/mesh`, `/audit`) are mapped directly to registered agent intents with extracted payloads.
+   - Any unstructured text is tagged with intent `free_query` and dispatched to the language model.
+   - The payload is encapsulated in a strongly typed `AgentMessage` with priority, timestamp, and unique UUID.
+
+2. **Coordinator Intent Routing**:
+   - The `AgentCoordinator` examines its capability registry.
+   - Messages are routed directly to the specialized domain agent registered for that intent.
+   - Any high-priority broadcast messages (such as solar flare radiation spikes emitted by `RadiationAgent`) are simultaneously fanned out to all registered agents to trigger defense posture changes.
+
+3. **Domain Agent Execution**:
+   - **`InventoryAgent`**: Executes fuzzy lookups on the SQLite database, computes depletion burn rates, and formats availability reports.
+   - **`RadiationAgent`**: Evaluates dosimetry telemetry against radiation thresholds, switches quantization modes, and toggles hardware TMR.
+   - **`MaintenanceAgent`**: Searches procedure documentation and writes cryptographically hashed records to the SHA-256 Merkle DAG.
+   - **`NavigationAgent`**: Manages store-and-forward bundles across the Delay-Tolerant Network and reconciles CRDT state with other modules.
+   - **`InferenceAgent`**: Coordinates neural text generation through the language model.
+
+4. **Neural Forward Pass (When routed to `InferenceAgent`)**:
+   - **Tokenization**: Input strings are encoded via `HabitatTokenizer` into Byte-Level BPE subword token sequences.
+   - **Multimodal & Sensor Injection**: Environmental telemetry (radiation, cabin pressure, temperature) is projected through the `SensorTelemetryEncoder` and prepended to the context.
+   - **Transformer Layers**: The 428K-parameter model runs with RoPE (Rotary Position Embeddings), RMSNorm, Differential Multi-Query Attention (with persistent KV cache), and SwiGLU feedforward networks or Sparse MoE expert routing.
+   - **Speculative Sampling**: Medusa auxiliary heads generate parallel candidate tokens to accelerate inference speed without accuracy loss.
+
+5. **Radiation-Adaptive Hardware Execution**:
+   - Under nominal space conditions, weight matrices run through the bare-metal C SIMD engine with INT8 symmetric quantization achieving up to 37.26 GOPS.
+   - Under critical radiation events, the engine falls back to INT4 precision with Triple Modular Redundancy (TMR median voting) and background ECC memory scrubbing to prevent Single-Event Upset (SEU) corruptions.
+
+6. **Constrained Decoding & Response Synthesis**:
+   - **Grammar Masking**: If machine structured output is requested, logits are constrained via finite-state JSON grammar masks to guarantee parseable output schemas.
+   - **Sampling & Detokenization**: Logits are sampled (Greedy, Top-P, Top-K, Temperature) and converted back to UTF-8 text via BPE detokenization.
+   - **Synthesis**: The `AgentCoordinator` receives the `AgentResponse`, appends the transaction to the coordinator's event ledger, formats the response into either prose or JSON based on the active mode, and prints it to the operator.
 
 ---
 
 ## Key Features
 
+- **Multi-Agent Architecture**: 5 domain-specific agents (`InventoryAgent`, `RadiationAgent`, `MaintenanceAgent`, `NavigationAgent`, `InferenceAgent`) coordinated through a typed message bus with intent-based routing, broadcast propagation, and fan-out dispatch.
 - **Compact Transformer Core**: 428K parameters using Rotary Position Embeddings (RoPE), RMSNorm, SwiGLU activations, Differential Multi-Query Attention, and Medusa heads for speculative sampling.
 - **Bare-Metal C SIMD Runtime**: Highly tuned C vectorization engine (`dslm_dot_product_int8`, `dslm_matvec_int8`) achieving **37.26 GOPS** on standard AVX2/SIMD edge hardware.
-- **Radiation-Adaptive Precision & Guarding (RAP-G)**: Dynamic telemetry-driven engine adapting quantization levels (`FP32`, `INT8`, `INT4`) and Triple Modular Redundancy (TMR median voting) depending on cosmic radiation threat levels (Low, Medium, Solar Flare, Cosmic Ray Surge).
+- **Radiation-Adaptive Precision & Guarding (RAP-G)**: Dynamic telemetry-driven engine adapting quantization levels (`FP32`, `INT8`, `INT4`) and Triple Modular Redundancy (TMR median voting) depending on cosmic radiation threat levels. Radiation events broadcast to all agents.
 - **Mixture-of-Experts (MoE)**: Sparse Top-1 / Top-k expert routing for localized domain specialization (Logistics, Diagnostics, Environmental Systems).
 - **Space Habitat Inventory Management**: Integrated SQLite database with Merkle DAG cryptographic transaction verification.
-- **Delay-Tolerant Networking (DTN Mesh)**: Store-and-forward bundle protocol simulating interplanetary comms latency and orbital node routing.
+- **Delay-Tolerant Networking (DTN Mesh)**: Store-and-forward bundle protocol with CRDT state sync, managed by the NavigationAgent.
 - **Byte-Level BPE Tokenizer**: Custom GPT-2 style byte-level subword tokenizer (`Ġ` space handling).
 - **Grammar-Constrained Decoding**: Finite-state grammar sampler enforcing structured JSON schema outputs for zero-parser-error downstream function calling.
 
@@ -80,10 +189,19 @@ deepspaceslm/
 │   ├── manuals.py          # Habitat technical procedure manuals
 │   ├── sample_inventory.json # Pre-loaded habitat supply inventory
 │   └── tokenizer.py        # Byte-level BPE subword tokenizer
-├── inference/              # Inference execution & interactive agent logic
+├── inference/              # Multi-agent inference framework
+│   ├── agents/             # Domain-specific agent modules
+│   │   ├── __init__.py     # Agent framework exports
+│   │   ├── base.py         # BaseAgent ABC, AgentMessage, AgentResponse protocol
+│   │   ├── coordinator.py  # AgentCoordinator — intent routing & broadcast bus
+│   │   ├── inventory_agent.py  # InventoryAgent — supply chain management
+│   │   ├── radiation_agent.py  # RadiationAgent — RAP-G defense coordination
+│   │   ├── maintenance_agent.py # MaintenanceAgent — audit & procedures
+│   │   ├── navigation_agent.py  # NavigationAgent — DTN mesh networking
+│   │   └── inference_agent.py   # InferenceAgent — SLM text generation
 │   ├── engine.py           # Autoregressive generation engine & sampler
 │   ├── grammar.py          # Constrained JSON grammar parser
-│   └── habitat_agent.py    # Command agent for logistics & sensor telemetry
+│   └── habitat_agent.py    # Backward-compatible facade over agent coordinator
 ├── model/                  # PyTorch SLM neural network modules
 │   ├── attention.py        # Multi-Query & Differential Attention
 │   ├── embeddings.py       # Token & Multimodal embeddings
@@ -99,14 +217,16 @@ deepspaceslm/
 │   ├── ptq.py              # Post-Training Quantization (INT8 / INT4 symmetric)
 │   ├── qat.py              # Quantization-Aware Training simulation
 │   └── rapg_engine.py      # Radiation-Adaptive Precision & Guarding engine
-├── tests/                  # Complete test suite (115 unit & integration tests)
+├── tests/                  # Complete test suite (unit, integration, & agent tests)
+│   ├── test_agents.py      # Multi-agent framework tests (50+ tests)
+│   └── ...                 # Model, inference, quantization, benchmark tests
 ├── training/               # Neural network training components
 │   ├── loss.py             # Label smoothed cross-entropy loss
 │   ├── scheduler.py        # Cosine annealing scheduler with linear warmup
 │   └── trainer.py          # Training loop runner
 ├── benchmark_suite.py      # Automated multi-system benchmark & profiling suite
 ├── chat.py                 # Interactive Neural REPL
-├── cli.py                  # Space Habitat Logistics Command Center
+├── cli.py                  # Multi-Agent Command Center (v3.0)
 ├── config.py               # Central Model & Environment configuration
 ├── pyproject.toml          # PEP 517 build configuration
 └── train.py                # Standalone training script
@@ -138,25 +258,40 @@ Run direct autoregressive inference from the PyTorch SLM backbone:
 python3 chat.py
 ```
 
-#### Habitat Logistics & Command CLI
-Launch the interactive space logistics agent terminal with slash commands (`/stock`, `/locate`, `/forecast`, `/manual`, `/rad`, `/alerts`, `/status`, `/mode`):
+#### Multi-Agent Command Center CLI
+Launch the interactive multi-agent command center with slash commands (`/stock`, `/locate`, `/forecast`, `/manual`, `/rad`, `/alerts`, `/status`, `/mode`, `/agents`, `/mesh`, `/audit`):
 ```bash
 python3 cli.py
 ```
 
 Example CLI session:
 ```text
-DeepSpace-SLM Command Center [Mode: RAPG_AUTO]
-Type /help for command list.
+[MULTI-AGENT SYSTEM NOMINAL] 5 domain agents active. Conversational Prose Mode.
 
-[Habitat Agent]> /stock Oxygen Tank
-[INVENTORY] Item: Oxygen Tank | Qty: 42 | Location: Deck 2 - Bay B | Status: NOMINAL
+DeepSpace-SLM > /agents
+╔══════════════════════════════════════════════════╗
+║  🤖 REGISTERED AGENTS (5)                        ║
+╠══════════════════════════════════════════════════╣
+║  inventory        5 capabilities
+║    • check_stock           Query current stock levels
+║    • locate                Find item storage location
+║    • forecast              Forecast supply duration
+║    • get_alerts            Retrieve low stock warnings
+║    • update_quantity       Adjust item quantity
+║  radiation        3 capabilities
+║  maintenance      3 capabilities
+║  navigation       4 capabilities
+║  inference        3 capabilities
+╚══════════════════════════════════════════════════╝
 
-[Habitat Agent]> /rad
-[RADIATION TELEMETRY] Current Flux: 0.12 mSv/h (NORMAL) | RAP-G Level: LOW (INT8)
+DeepSpace-SLM > /stock Oxygen Tank
+[STOCK REPORT] Item: o2 canister | Qty: 48 units | Status: full | Loc: storage bay a1
 
-[Habitat Agent]> /forecast Food Rations
-[FORECAST] Projected depletion in 142 days under current consumption rate.
+DeepSpace-SLM > /rad 3000
+[RAP-G DYNAMIC DEFENSE UPDATE]
+  Radiation Level: 3000.0 uGy/h
+  Threat Level:    CRITICAL
+  Active Defenses: TMR Median Voting, High-Frequency Scrubber (50ms), Radiation Shielding
 ```
 
 ---

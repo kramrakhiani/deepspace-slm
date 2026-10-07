@@ -40,3 +40,4 @@ venv.bak/
 build/
 dist/
 *.egg-info/
+*.pptx
