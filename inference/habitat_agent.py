@@ -248,12 +248,255 @@ class HabitatAgent:
     # ── Delegated to InferenceAgent ───────────────────────────────────
 
     def free_query(self, query: str) -> str:
+        """
+        Route a natural-language query to the appropriate domain agent.
+
+        If a domain agent can answer the query, its tool result is returned.
+        Otherwise, fall back to the SLM's free-form generation.
+        """
+
+        intent, payload = self._route_query(query)
+
+        # ---------------------------------------------------------
+        # 1. Domain-agent path
+        # ---------------------------------------------------------
+        if intent != "free_query":
+            response = self.coordinator.dispatch(AgentMessage(
+                intent=intent,
+                payload=payload,
+                source="natural_language_router",
+            ))
+
+            if response.status == "success":
+                return self._format_agent_response(response)
+
+        # ---------------------------------------------------------
+        # 2. Fallback to pure SLM generation
+        # ---------------------------------------------------------
         response = self.coordinator.dispatch(AgentMessage(
             intent="free_query",
-            payload={"query": query, "max_new_tokens": 128, "greedy": True},
+            payload={
+                "query": query,
+                "max_new_tokens": 128,
+                "greedy": True,
+            },
             source="habitat_agent",
         ))
+
         return response.data.get("generated_text", "")
+    
+    def _route_query(self, query: str):
+        """
+        Lightweight natural-language intent router.
+
+        Converts an astronaut's natural-language query into:
+            intent + payload
+
+        The coordinator then sends that intent to the appropriate agent.
+        """
+
+        q = query.lower().strip()
+
+        # =========================================================
+        # INVENTORY DOMAIN
+        # =========================================================
+
+        inventory_words = [
+            "oxygen", "o2", "tank", "canister",
+            "water", "filter", "food", "ration",
+            "inventory", "stock", "supply",
+            "medical", "medicine", "kit",
+            "antibiotic", "wrench", "tools",
+            "scrubber", "nitrogen", "n2"
+        ]
+
+        if any(word in q for word in inventory_words):
+
+            # Determine the item
+            item = self._extract_inventory_item(q)
+
+            # Location query
+            if any(word in q for word in [
+                "where", "location", "located", "stored"
+            ]):
+                return "locate", {"item_name": item}
+
+            # Forecast / duration query
+            if any(word in q for word in [
+                "how long", "how many days",
+                "days remaining", "last", "duration"
+            ]):
+                return "forecast", {
+                    "item_name": item,
+                    "days": 30
+                }
+
+            # Alert query
+            if any(word in q for word in [
+                "alert", "warning", "low stock",
+                "running low", "critical"
+            ]):
+                return "get_alerts", {}
+
+            # Default inventory operation = stock check
+            return "check_stock", {"item_name": item}
+
+        # =========================================================
+        # RADIATION DOMAIN
+        # =========================================================
+
+        radiation_words = [
+            "radiation",
+            "radiation level",
+            "solar flare",
+            "radiation threat",
+            "radiation status",
+            "radiation exposure"
+        ]
+
+        if any(word in q for word in radiation_words):
+
+            return "radiation_status", {}
+
+        # =========================================================
+        # MAINTENANCE DOMAIN
+        # =========================================================
+
+        maintenance_words = [
+            "maintenance",
+            "repair",
+            "procedure",
+            "manual",
+            "maintenance manual",
+            "how do i repair",
+            "how to repair"
+        ]
+
+        if any(word in q for word in maintenance_words):
+
+            return "query_manual", {
+                "query": query
+            }
+
+        # =========================================================
+        # AUDIT DOMAIN
+        # =========================================================
+
+        if any(word in q for word in [
+            "audit",
+            "integrity",
+            "merkle",
+            "transaction history"
+        ]):
+            return "verify_audit", {}
+
+        # =========================================================
+        # NAVIGATION / NETWORK DOMAIN
+        # =========================================================
+
+        navigation_words = [
+            "navigation",
+            "network",
+            "mesh",
+            "connection",
+            "connectivity",
+            "antenna",
+            "dtn"
+        ]
+
+        if any(word in q for word in navigation_words):
+
+            return "mesh_status", {}
+
+        # =========================================================
+        # NO KNOWN DOMAIN
+        # =========================================================
+
+        return "free_query", {}
+    
+    def _extract_inventory_item(self, query: str) -> str:
+        """
+        Convert natural-language references into database item names.
+        """
+
+        q = query.lower()
+
+        # Oxygen
+        if "oxygen" in q or "o2" in q:
+            return "o2 canister"
+
+        # Nitrogen
+        if "nitrogen" in q or "n2" in q:
+            return "n2 tank"
+
+        # Water
+        if "water" in q:
+            return "water filter"
+
+        # Food
+        if "food" in q or "ration" in q:
+            return "food ration"
+
+        # CO2
+        if "co2" in q or "carbon dioxide" in q:
+            return "co2 scrubber"
+
+        # Medical
+        if "medical" in q or "medicine" in q or "med kit" in q:
+            return "medical kit"
+
+        # Antibiotics
+        if "antibiotic" in q:
+            return "antibiotic pack"
+
+        # Tools
+        if "wrench" in q or "tools" in q:
+            return "wrench set"
+
+        # Default
+        return query
+    
+    def _format_agent_response(self, response: AgentResponse) -> str:
+        """
+        Convert structured agent output into a readable response.
+
+        The SLM can later be used here for natural-language synthesis.
+        """
+
+        data = response.data
+
+        if response.agent_id == "inventory":
+
+            item = data.get("item", "item")
+            quantity = data.get("quantity")
+            unit = data.get("unit", "units")
+            location = data.get("location")
+            days = data.get("days_remaining")
+
+            parts = []
+
+            if quantity is not None:
+                parts.append(
+                    f"There are {quantity} {unit} of {item} remaining."
+                )
+
+            if location:
+                parts.append(
+                    f"They are stored in {location}."
+                )
+
+            if days is not None:
+                parts.append(
+                    f"The estimated remaining supply is {days} days."
+                )
+
+            return " ".join(parts)
+
+        # Other agents
+        if response.messages:
+            return " ".join(response.messages)
+
+        return str(data)
 
     # ── Response Parsing (legacy compatibility) ───────────────────────
 
